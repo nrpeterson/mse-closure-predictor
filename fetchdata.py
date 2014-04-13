@@ -8,9 +8,7 @@ from io import BytesIO
 # Set up timestamps to grab results from 28 to 14 days ago.
 today = dt.datetime.today()
 end = today - dt.timedelta(days=14)
-start = end - dt.timedelta(days=14)
 end = int(end.timestamp())
-start = int(start.timestamp())
 
 items = list()
 
@@ -19,11 +17,10 @@ for page in range(1,11):
     url = "http://api.stackexchange.com/2.2/search/advanced"
     params = dict()
     params['key'] = 'dWDGnVFUsu2Nu11MiamE4A(('
-    params['closed'] = 'True'
+    params['closed'] = 'False'
     params['page'] = page
     params['pagesize'] = 100
-    params['fromdate'] = start
-    params['enddate'] = end
+    params['todate'] = end
     params['order'] = 'desc'
     params['sort'] = 'creation'
     params['site'] = 'math'
@@ -37,7 +34,9 @@ for page in range(1,11):
     text = f.read().decode()
 
     data = json.loads(text)
-    print("Done!")
+    print("Done! {0} queries remaining for today.".format(
+        data['quota_remaining']))
+
     for item in data['items']:
         items.append(item)
 
@@ -45,15 +44,16 @@ for page in range(1,11):
         break
 
 # Then, fetch posts which ARE closed.
-for page in range(1,11):
+found_closed = 0
+page = 1
+while True:
     url = "http://api.stackexchange.com/2.2/search/advanced"
     params = dict()
     params['key'] = 'dWDGnVFUsu2Nu11MiamE4A(('
-    params['closed'] = 'False'
+    params['closed'] = 'True'
     params['page'] = page
     params['pagesize'] = 100
-    params['fromdate'] = start
-    params['enddate'] = end
+    params['todate'] = end
     params['order'] = 'desc'
     params['sort'] = 'creation'
     params['site'] = 'math'
@@ -67,12 +67,19 @@ for page in range(1,11):
     text = f.read().decode()
 
     data = json.loads(text)
-    print("Done!")
+    print("Done! {0} queries remaining for today.".format(
+        data['quota_remaining']))
+    
     for item in data['items']:
-        items.append(item)
+        if 'closed_details' in item:
+            if 'context' in item['closed_details']['description']:
+                items.append(item)
+                found_closed += 1
 
-    if not data['has_more']:
+    if not data['has_more'] or found_closed >= 500:
         break
+    else:
+        page += 1
 
 print("Fetched a total of {0} items.".format(len(items)))
 

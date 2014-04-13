@@ -76,3 +76,4 @@ if __name__ == "__main__":
     for item in rawdata:
         writer.writerow(extract_data(item))
 
+    print("Wrote data to cleandata.csv, with {0} columns".format(len(fields)))
