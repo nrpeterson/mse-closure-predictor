@@ -1,9 +1,13 @@
 import json
 import csv
-
+import random
 # List of fields that will occur in the CSV file of cleaned date, so that
 # this list can be imported by other code rather than inferred.
-fields = ['id', 'author_rep', 'calculus', 'closed', 'colons', 'commands', 'commas', 'dollars', 'doubledollars', 'effort', 'homework', 'num_tags', 'paragraphs', 'periods', 'pleas', 'politeness', 'post_length', 'precalc', 'questionmarks', 'questions', 'quotes', 'spaces', 'title_length', 'txtspeak']
+fields = ['author_rep', 'calculus', 'colons', 'commands', 'commas', 
+    'dollars', 'doubledollars', 'effort', 'emoticons', 'homework', 'num_tags', 
+    'paragraphs', 'periods', 'pleas', 'politeness', 'post_length', 'precalc', 
+    'questionmarks', 'questions', 'quotes', 'spaces', 'title_length',
+    'txtspeak', 'closed']
 
 
 def extract_data(item):
@@ -14,18 +18,18 @@ def extract_data(item):
     # Define some word groups to search for as part of data measurement.
     demands = ['prove', 'Prove', 'show', 'Show', 'compute', 'Compute', 
             'calculate', 'Calculate', 'find', 'Find', 'Explain', 'explain']
-    txtspeak = [' i ', ' u ']
+    effort = ['I tried', "I've tried", "My attempt", 'my attempt', 
+            'work so far']
+    emoticons = [':)', ':-)', ':(', ':-(', ':D', ':-D', ';-)', ';)', '(:', '):',
+            ':$', ':-$']
     pleas = ['help', 'Help', "don't understand", "don't get it", 
             "don't see how", 'show me', 'Show me', 'stuck', 'Stuck']
     polite = ['please', 'Please', 'thanks', 'Thanks', 'Thank you', 'thank you']
-    effort = ['I tried', "I've tried", "My attempt", 'my attempt', 
-            'work so far']
     questions = ['where', 'Where', 'what', 'What', 'when', 'When', 'why', 
             'Why', 'how', 'How', 'who', 'Who']
+    txtspeak = [' u ', 'pls', 'Pls', 'Thx', 'thx']
 
     stats = dict()
-    
-    stats['id'] = item['question_id']
     
     if 'owner' in item and 'reputation' in item['owner']:
         stats['author_rep'] = item['owner']['reputation']
@@ -46,6 +50,7 @@ def extract_data(item):
     stats['dollars'] = item['body'].count('$')
     stats['doubledollars'] = item['body'].count('$$')
     stats['effort'] = sum([item['body'].count(word) for word in effort])
+    stats['emoticons'] = sum([item['body'].count(word) for word in emoticons])
     stats['homework'] = int('homework' in item['tags'])
     stats['num_tags'] = len(item['tags'])
     stats['paragraphs'] = item['body'].count('<p>')
@@ -68,9 +73,9 @@ def extract_data(item):
 if __name__ == "__main__":
     rawdatafile = open('rawdata.json', 'r')
     rawdata = json.load(rawdatafile)
-    
+    random.shuffle(rawdata) 
     cleandatafile = open('cleandata.csv', 'w')
-    writer = csv.DictWriter(cleandatafile, fields)
+    writer = csv.DictWriter(cleandatafile, fields, quoting=csv.QUOTE_NONNUMERIC)
     writer.writeheader()
 
     for item in rawdata:
