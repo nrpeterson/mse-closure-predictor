@@ -1,8 +1,5 @@
 # Specific files to ignore
 dbaseconfig.txt
-site.py
-autostart.cgi
-pid
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
