@@ -1,5 +1,6 @@
 import json
 import gzip
+import urllib
 from urllib.request import urlopen
 from urllib.parse import urlencode, unquote
 import datetime as dt
@@ -30,16 +31,14 @@ while True:
 
     fullurl = url + '?' + urlencode(params)
     print("Fetching page {0}...".format(page))
-    while True:
-        try:
-            response = urlopen(fullurl)
-            buf = BytesIO(response.read())
-            f = gzip.GzipFile(fileobj=buf)
-            text = f.read().decode()
-        except urllib.HTTPError:
-            print("Error!  Retrying...")
-            continue
-        break
+    try:
+        response = urlopen(fullurl)
+        buf = BytesIO(response.read())
+        f = gzip.GzipFile(fileobj=buf)
+        text = f.read().decode()
+    except:
+        print("Error!  Moving along.")
+        continue
     
     data = json.loads(text)
     print("Done! {0} queries remaining for today.".format(
@@ -51,13 +50,13 @@ while True:
                 items.append(item)
                 found_closed += 1
 
-    if not data['has_more'] or found_closed >= 1000:
+    if not data['has_more'] or found_closed >= 2000:
         break
     else:
         page += 1
 
 # First, fetch questions which were NOT closed.
-for page in range(1,11):
+for page in range(1,21):
     url = "http://api.stackexchange.com/2.2/search/advanced"
     params = dict()
     params['key'] = 'dWDGnVFUsu2Nu11MiamE4A(('
@@ -78,7 +77,7 @@ for page in range(1,11):
             buf = BytesIO(response.read())
             f = gzip.GzipFile(fileobj=buf)
             text = f.read().decode()
-        except urllib.HTTPError:
+        except:
             print("Error!  Retrying...")
             continue
         break

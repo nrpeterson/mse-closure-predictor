@@ -5,7 +5,7 @@ import csv
 import json
 
 lmbda = .1
-hidden_layer_size = 10
+hidden_layer_size = 30
 
 def sigmoid_gradient(z):
     return sigmoid(z) * (1 - sigmoid(z))
@@ -42,7 +42,6 @@ def cost_function(nn_params, X, y):
 
 def approx_grad(nn_params, X, y):
     eps = .00001
-    print(nn_params.shape)
     grad = np.zeros(nn_params.shape)
     for i in range(nn_params.size):
         nudge = np.zeros(nn_params.shape)
@@ -73,13 +72,15 @@ def cost_grad(nn_params, X, y):
         v = X[i].reshape((n,1))
         a1 = np.vstack((np.ones((1,1)), v))
         z2 = np.dot(Theta1, a1)
-        a2 = np.vstack((np.ones((1,1)), sigmoid(z2)))
+        a2 = sigmoid(z2)
+        a2 = np.vstack((np.ones((1,1)), a2))
         z3 = np.dot(Theta2, a2)
         a3 = sigmoid(z3)
         
         delta3 = a3 - y[i]
         delta2 = np.dot(Theta2.transpose(), delta3)[1:] * sigmoid_gradient(z2)
         delta2 = delta2.reshape((s,1))
+        
         a1 = a1.reshape((n+1,1))
         D1 = D1 + np.dot(delta2, a1.transpose())
         
@@ -89,11 +90,18 @@ def cost_grad(nn_params, X, y):
 
     Theta1_grad = D1 / m
     Theta2_grad = D2 / m
-    print(Theta1_grad.shape, Theta2_grad.shape)
+    
+    reg1 = (lmbda / m) * Theta1
+    reg1[:,0] = 0
+    reg2 = (lmbda / m) * Theta2
+    reg2[:,0] = 0
+    
+    Theta1_grad += reg1
+    Theta2_grad += reg2
+    
     grad = np.concatenate((Theta1_grad.flatten(), Theta2_grad.flatten()))
     approx = approx_grad(nn_params, X, y)
     print("Difference in computed norms: {0}".format(np.linalg.norm(grad-approx)))
-    print(grad/approx) 
     return grad
 
 
@@ -104,7 +112,7 @@ def callback(nn_params, X, y):
     Nfeval += 1
 
 
-def build_model():
+def build_nn_model():
     csvfile = open('cleandata.csv', newline='')
     reader = csv.reader(csvfile, quoting=csv.QUOTE_NONNUMERIC)
     next(reader)
@@ -132,7 +140,7 @@ def build_model():
     grad = lambda t: cost_grad(t, X, y)
     cb = lambda t: callback(t, X, y)
 
-    nn_params = fmin_cg(cost, nn_params0, callback=cb, maxiter=25 )
+    nn_params = fmin_cg(cost, nn_params0, callback=cb, maxiter=30 )
     Theta1 = nn_params[0:s*(n+1)]
     Theta1 = Theta1.reshape((s, n+1))
     Theta2 = nn_params[s*(n+1):].reshape((1, s+1))
@@ -143,4 +151,4 @@ def build_model():
     json.dump((mean.tolist(), std.tolist(), s, Theta1.tolist(), Theta2.tolist()), f)
 
 if __name__ == "__main__":
-    build_model()
+    build_nn_model()

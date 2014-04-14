@@ -1,43 +1,58 @@
+import csv
 import numpy as np
 from scipy.special import expit as sigmoid
-from scipy.optimize import minimize
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
+import pickle
 import json
-import csv
 
-def predict(X):
-    f = open('parameters.json', 'r')
-    (mean, std, s, Theta1, Theta2) = json.load(f)
-    f.close()
+from cleandata import extract_data, fields
 
-    if X.ndim == 1:
-        n = X.size
-        m = 1
-        X = X.reshape((1, n))
-    else:
-        m, n = X.shape
-    
-    mean = np.array(mean)
-    std = np.array(std)
-    Theta1 = np.array(Theta1)
-    Theta2 = np.array(Theta2)
 
-    X = X.copy()
-    X = (X - mean) / std
-
-    v1 = np.dot(np.hstack((np.ones((m, 1)), X)), Theta1.transpose())
-    h1 = sigmoid(v1)
-    v2 = np.dot(np.hstack((np.ones((m, 1)), h1)), Theta2.transpose())
-    p = sigmoid(v2)
-    return p
-
-if __name__ == '__main__':
-    f = open('cleandata.csv', newline='')
-    reader = csv.reader(f, quoting=csv.QUOTE_NONNUMERIC)
+def build_model():
+    # Read in the data
+    csvfile = open('cleandata.csv', newline='')
+    reader = csv.reader(csvfile, quoting=csv.QUOTE_NONNUMERIC)
     next(reader)
     data = np.array([row for row in reader])
+
+    # Split the data up in to our inputs (X) and outputs (y)
+    X = data[:, :-1]
+    y = data[:, -1]
+
+    # Set up the scaler, and transform the data
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Initialize the Linear SVC:
+    classifier = LinearSVC()
+    classifier.fit(X, y)
+
+    with open('model.pickle', 'wb') as f:
+        pickle.dump((scaler, classifier), f)
+
+def probabilities(posts):
+    # Read in Model
+    with open('model.pickle', 'rb') as f:
+        scaler, classifier = pickle.load(f)
+    
+    jsondata = [extract_data(post) for post in posts]
+
+    data = []
+    for post in jsondata:
+        data.append([post[key] for key in fields])
+    data = np.matrix(data)
+
     X = data[:,:-1]
-    y = data[:,-1]
-    probs = predict(X)
-    y = y.reshape(probs.shape)
-    error = np.sum(np.abs(y - np.around(probs)))
-    print("Correctly predicted {:.2%}".format(1-error/X.shape[0]))
+    X_scaled = scaler.transform(X)
+    probs = sigmoid(classifier.decision_function(X))
+    return probs
+
+
+if __name__ == '__main__':
+    with open('rawdata.json', 'r') as f:
+        posts = json.load(f)
+
+    probs = probabilities(posts)
+
+    print('Max: {}'.format(max(probs)))
