@@ -1,16 +1,16 @@
 import json
-import csv
-import random
-# List of fields that will occur in the CSV file of cleaned date, so that
-# this list can be imported by other code rather than inferred.
-fields = ['author_rep', 'calculus', 'colons', 'commands', 'commas', 
-    'dollars', 'doubledollars', 'effort', 'emoticons', 'homework', 'num_tags', 
-    'paragraphs', 'periods', 'pleas', 'politeness', 'post_length', 'precalc', 
-    'questionmarks', 'questions', 'quotes', 'spaces', 'title_length',
+import pymysql
+import model
+import numpy as np
+
+# List of fields that will occur in the database of cleaned data
+fields = ['id', 'authorrep', 'calculus', 'colons', 'commands', 'commas', 
+    'dollars', 'doubledollars', 'effort', 'emoticons', 'homework', 'numtags', 
+    'paragraphs', 'periods', 'pleas', 'politeness', 'postlength', 'precalc', 
+    'questionmarks', 'questions', 'quotes', 'spaces', 'titlelength',
     'txtspeak', 'closed']
 
-
-def extract_data(item):
+def extract_data_dict(item):
     """Given item (a dict extracted from StackExchange JSON data), extract 
     metrics and return a dict of the results.
     """
@@ -31,11 +31,15 @@ def extract_data(item):
 
     stats = dict()
     
+
+    # Handle the fact that posts are occasionally anonymous by declaring such
+    # users to have the minimum possible reputation (1)
     if 'owner' in item and 'reputation' in item['owner']:
-        stats['author_rep'] = item['owner']['reputation']
+        stats['authorrep'] = item['owner']['reputation']
     else:
-        stats['author_rep'] = 1
+        stats['authorrep'] = 1
     
+    # If question has been closed, check to see if it is for the desired reason
     if 'closed_details' in item:
         desc = item['closed_details']['description']
         stats['closed'] = int('context' in desc)
@@ -52,33 +56,108 @@ def extract_data(item):
     stats['effort'] = sum([item['body'].count(word) for word in effort])
     stats['emoticons'] = sum([item['body'].count(word) for word in emoticons])
     stats['homework'] = int('homework' in item['tags'])
-    stats['num_tags'] = len(item['tags'])
+    stats['id'] = item['question_id']
+    stats['numtags'] = len(item['tags'])
     stats['paragraphs'] = item['body'].count('<p>')
     stats['periods'] = item['body'].count('.')
     stats['pleas'] = sum([item['body'].count(word) for word in pleas])
     stats['politeness'] = sum([item['body'].count(word) for word in polite])
-    stats['post_length'] = len(item['body'])
+    stats['postlength'] = len(item['body'])
     stats['precalc'] = int('algebra-precalculus' in item['tags'])
     stats['questionmarks'] = item['body'].count('?')
     stats['questions'] = sum([item['body'].count(word) for word in questions])
     stats['quotes'] = item['body'].count('"') + item['body'].count("'")
     stats['spaces'] = item['body'].count(' ')
-    stats['title_length'] = len(item['title'])
+    stats['titlelength'] = len(item['title'])
     stats['txtspeak'] = sum([item['body'].count(word) for word in txtspeak])
 
     return stats
 
-# If the script is called directly, process the file 'rawdata.json' to extract
-# metric information in to cleandata.csv
+def extract_data_vector(item, include_closed=False, include_id=False):
+    """Given item (a dict extracted from StackExchange JSON data), return
+    a list of the extracted data, in the order desired by the database.
+
+    include_closed: Do you want the closed status of the post?
+    include_id:     Do you want the question ID of the post? (Key for dbase)
+    """
+
+    stats = extract_data_dict(item)
+   
+    if include_closed:
+        end = len(fields)
+    else:
+        end = len(fields) - 1
+
+    if include_id:
+        start = 0
+    else:
+        start = 1
+    vec = tuple(stats[field] for field in fields[start:end])
+    return vec
+
+def add_to_training_data(posts):
+    """ Given posts (a list of dicts extracted from StackExchange JSON data), 
+    add posts to the training data stored in the database.
+
+    Note: If a post ID is already in the training database, it is updated with
+    the newly-extracted measurements.
+    """
+
+    query = "INSERT INTO trainingdata ("
+    query += ', '.join(fields) + ") VALUES "
+    
+    datavecs = [str(tuple(extract_data_vector(item, True, True))) for item in posts]
+    
+    query += ",\n".join(datavecs)
+    query += " ON DUPLICATE KEY UPDATE "
+    query += ','.join(["{0}=VALUES({0})".format(field) for field in fields[1:]])
+    query += ';\n'
+
+    f = open('dbase.conf', 'r')
+    dbase, user, passwd = f.readline().rstrip().split(',')
+    f.close()
+    conn = pymysql.connect(user=user, passwd=passwd, db=dbase)
+    cur = conn.cursor()
+    count = cur.execute(query)
+    conn.commit()
+    print("Successfully merged {} entries!".format(count))
+
+    cur.close()
+    conn.close()
+
+    model.build_model()
+
+def update_live_data(posts):
+    """ Given posts (a list of dicts extracted from StackExchange JSON data),
+    replace the current live data with the information in posts.
+    """
+
+    query = '''INSERT INTO livedata (id, postlink, title, body, prediction, '''
+    query += '''prob) VALUES ("%s", "%s", "%s", "%s", "%s", "%s");'''
+    
+
+    predictions = model.predictions(posts)
+    probabilities = model.probabilities(posts)
+    queryvals = []
+    for post, pred, prob in zip(posts, predictions, probabilities):
+        queryvals.append((post['question_id'], post['link'], post['title'], 
+            post['body_markdown'], float(pred), float(prob)))
+    
+    f = open('dbase.conf', 'r')
+    dbase, user, passwd = f.readline().rstrip().split(',')
+    f.close()
+    conn = pymysql.connect(user=user, passwd=passwd, db=dbase, charset='utf8')
+    cur = conn.cursor()
+    count = cur.executemany(query, queryvals)
+    conn.commit()
+    print("Successfully merged {} entries!".format(count))
+
+    cur.close()
+    conn.close()
+# If the script is called directly, process the file 'rawtrainingdata.json' to 
+# extract metric information in to database
 if __name__ == "__main__":
-    rawdatafile = open('rawdata.json', 'r')
+    rawdatafile = open('rawtrainingdata.json', 'r')
     rawdata = json.load(rawdatafile)
-    random.shuffle(rawdata) 
-    cleandatafile = open('cleandata.csv', 'w')
-    writer = csv.DictWriter(cleandatafile, fields, quoting=csv.QUOTE_NONNUMERIC)
-    writer.writeheader()
 
-    for item in rawdata:
-        writer.writerow(extract_data(item))
-
-    print("Wrote data to cleandata.csv, with {0} columns".format(len(fields)))
+    add_to_training_data(rawdata)

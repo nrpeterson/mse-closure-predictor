@@ -1,5 +1,8 @@
 # Specific files to ignore
-dbaseconfig.txt
+dbase.conf
+site.py
+autostart.cgi
+pid
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
