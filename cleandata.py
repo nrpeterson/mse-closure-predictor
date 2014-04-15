@@ -133,7 +133,7 @@ def update_live_data(posts):
     """
 
     query = '''INSERT INTO livedata (id, postlink, title, body, prediction, '''
-    query += '''prob) VALUES ("%s", "%s", "%s", "%s", "%s", "%s");'''
+    query += '''prob) VALUES ("%s", "%s", "%s", "%s", "%s", "%s") '''
     
 
     predictions = model.predictions(posts)
@@ -148,6 +148,7 @@ def update_live_data(posts):
     f.close()
     conn = pymysql.connect(user=user, passwd=passwd, db=dbase, charset='utf8')
     cur = conn.cursor()
+    cur.execute("DELETE FROM livedata WHERE 1")
     count = cur.executemany(query, queryvals)
     conn.commit()
     print("Successfully merged {} entries!".format(count))

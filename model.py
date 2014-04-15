@@ -1,8 +1,9 @@
 import numpy as np
 from scipy.special import expit as sigmoid
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, SVC
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 import pickle
 import json
 import pymysql
@@ -35,7 +36,7 @@ def build_model():
 
     # Initialize the classifier:
     print("Training the classifier...")
-    classifier = LogisticRegression(C=.3)
+    classifier =  SVC(probability=True) #LogisticRegression(C=20.)
     classifier.fit(X_scaled, y)
     print("Done. Classifier score: {:04f}".format(classifier.score(X_scaled, y)))
 
@@ -53,7 +54,7 @@ def probabilities(posts):
     X = np.array(data, dtype=np.float64)
 
     X_scaled = scaler.transform(X)
-    probs = classifier.predict_proba(X_scaled)[:,0]
+    probs = classifier.predict_proba(X_scaled)[:,1]
     return probs
 
 def predictions(posts):
@@ -68,7 +69,4 @@ def predictions(posts):
 
 if __name__ == '__main__':
     build_model()
-    with open('rawdata.json', 'r') as f:
-        posts = json.load(f)
 
-    probs = probabilities(posts)
