@@ -3,6 +3,7 @@ dbase.conf
 site.py
 autostart.cgi
 pid
+templates
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

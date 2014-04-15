@@ -141,7 +141,7 @@ def update_live_data(posts):
     queryvals = []
     for post, pred, prob in zip(posts, predictions, probabilities):
         queryvals.append((post['question_id'], post['link'], post['title'], 
-            post['body_markdown'], float(pred), float(prob)))
+            post['body'],float(pred), float(prob)))
     
     f = open('dbase.conf', 'r')
     dbase, user, passwd = f.readline().rstrip().split(',')
