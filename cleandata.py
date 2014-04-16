@@ -1,3 +1,10 @@
+""" A collection of methods for handling data gathered through the 
+    StackExchange API. Includes methods for extracting metric data from 
+    StackExchange JSON archives, and methods for putting that data in to a 
+    MySQL database. 
+"""
+
+
 import json
 import pymysql
 import model
@@ -9,6 +16,7 @@ fields = ['id', 'authorrep', 'calculus', 'colons', 'commands', 'commas',
     'paragraphs', 'periods', 'pleas', 'politeness', 'postlength', 'precalc', 
     'questionmarks', 'questions', 'quotes', 'spaces', 'titlelength',
     'txtspeak', 'closed']
+
 
 def extract_data_dict(item):
     """Given item (a dict extracted from StackExchange JSON data), extract 
@@ -31,7 +39,6 @@ def extract_data_dict(item):
 
     stats = dict()
     
-
     # Handle the fact that posts are occasionally anonymous by declaring such
     # users to have the minimum possible reputation (1)
     if 'owner' in item and 'reputation' in item['owner']:
@@ -73,6 +80,7 @@ def extract_data_dict(item):
 
     return stats
 
+
 def extract_data_vector(item, include_closed=False, include_id=False):
     """Given item (a dict extracted from StackExchange JSON data), return
     a list of the extracted data, in the order desired by the database.
@@ -95,9 +103,11 @@ def extract_data_vector(item, include_closed=False, include_id=False):
     vec = tuple(stats[field] for field in fields[start:end])
     return vec
 
+
 def add_to_training_data(posts):
     """ Given posts (a list of dicts extracted from StackExchange JSON data), 
-    add posts to the training data stored in the database.
+    add posts to the training data stored in the database. The model is then
+    retrained using all available data.
 
     Note: If a post ID is already in the training database, it is updated with
     the newly-extracted measurements.
@@ -127,13 +137,13 @@ def add_to_training_data(posts):
 
     model.build_model()
 
+
 def update_live_data(posts):
     """ Given posts (a list of dicts extracted from StackExchange JSON data),
     replace the current live data with the information in posts.
     """
 
-    query = '''INSERT INTO livedata (id, postlink, title, body, prediction, '''
-    query += '''prob) VALUES ("%s", "%s", "%s", "%s", "%s", "%s") '''
+    query = '''INSERT INTO livedata (id, postlink, title, body, userid, username, userrep, userlink, userpic, prediction, prob) VALUES ("%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s") '''
     
 
     predictions = model.predictions(posts)
@@ -141,7 +151,7 @@ def update_live_data(posts):
     queryvals = []
     for post, pred, prob in zip(posts, predictions, probabilities):
         queryvals.append((post['question_id'], post['link'], post['title'], 
-            post['body'],float(pred), float(prob)))
+            post['body'], post['owner']['user_id'], post['owner']['display_name'], post['owner']['reputation'], post['owner']['link'], post['owner']['profile_image'], float(pred), float(prob)))
     
     f = open('dbase.conf', 'r')
     dbase, user, passwd = f.readline().rstrip().split(',')
@@ -155,6 +165,8 @@ def update_live_data(posts):
 
     cur.close()
     conn.close()
+
+
 # If the script is called directly, process the file 'rawtrainingdata.json' to 
 # extract metric information in to database
 if __name__ == "__main__":

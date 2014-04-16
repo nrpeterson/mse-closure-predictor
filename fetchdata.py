@@ -10,6 +10,12 @@ from io import BytesIO
 import cleandata
 
 def fetch_training_data():
+    """Scrape posts from Math.StackExchange; attempts to grab similar numbers
+    of posts that are open vs closed, and only grabs posts that are at least
+    14 days old. Posts are then added to our trainingdata database table,
+    and the model is updated accordingly.
+    """
+    
     # Set up timestamps to grab results from 28 to 14 days ago.
     today = dt.datetime.today()
     end = today - dt.timedelta(days=14)
@@ -102,7 +108,12 @@ def fetch_training_data():
 
     cleandata.add_to_training_data(items)
 
+
 def fetch_live_data():
+    """Fetch 30 recent posts from Math.StackExchange, and put them in our
+    livedata database table.
+    """
+
     url = "http://api.stackexchange.com/2.2/questions"
     params = dict()
     params['key'] = 'dWDGnVFUsu2Nu11MiamE4A(('
@@ -111,7 +122,7 @@ def fetch_live_data():
     params['order'] = 'desc'
     params['sort'] = 'creation'
     params['site'] = 'math'
-    params['filter'] = '!OfY_RfJwZ9)ZZHfPph2)A*5mrJRnBrLuNr0R6QQWH8X'
+    params['filter'] = '!DEQ-Ym_UYcXdWVqQKfG-uceF55VWevo(ce8jdFeVBML1L32IGEP'
 
     fullurl = url + '?' + urlencode(params)
     
@@ -139,5 +150,6 @@ def fetch_live_data():
     except URLError:
         print("Error!  Try again in a couple of minutes.")
 
+# If called as a script: fetch new live data.
 if __name__ == '__main__':
     fetch_live_data()

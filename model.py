@@ -1,3 +1,8 @@
+"""A collection of methods for training a classifier to predict whether posts
+    from Mathematics.StackExchange will be closed due to 'lack of context', and
+    for using that model to make predictions.
+"""
+
 import numpy as np
 from scipy.special import expit as sigmoid
 from sklearn.preprocessing import StandardScaler
@@ -11,6 +16,10 @@ import pymysql
 import cleandata
 
 def build_model():
+    """Fit a classifier to the data stored in our trainingdata database table.
+    Store the model using pickle, for later use in predictions.
+    """
+    
     # Read in the data
     f = open('dbase.conf', 'r')
     dbase, user, passwd = f.readline().rstrip().split(',')
@@ -45,7 +54,12 @@ def build_model():
         pickle.dump((scaler, classifier), f)
     print("Done!")
 
+
 def probabilities(posts):
+    """Given a collection of posts (in StackExchange JSON format), return our
+    model's estimated probabilities that the posts will be closed.
+    """
+    
     # Read in Model
     with open('model.pickle', 'rb') as f:
         scaler, classifier = pickle.load(f)
@@ -57,7 +71,12 @@ def probabilities(posts):
     probs = classifier.predict_proba(X_scaled)[:,1]
     return probs
 
+
 def predictions(posts):
+    """Given a collection of posts (in StackExchange JSON format), return our
+    model's predictions for whether or not each post will be closed.
+    """
+
     # Read in Model
     with open('model.pickle', 'rb') as f:
         scaler, classifier = pickle.load(f)
@@ -67,6 +86,8 @@ def predictions(posts):
     preds = classifier.predict(X_scaled)
     return preds
 
+
+# If called as a script: rebuild the model.
 if __name__ == '__main__':
     build_model()
 
